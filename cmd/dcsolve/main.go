@@ -145,7 +145,7 @@ func main() {
 		matches = reg_varname.FindStringSubmatch(line)
 		if len(matches) > 0 {
 			if *flagv > 0 {
-				fmt.Printf(";; variable \"%s\" defined\n", matches[1])
+				fmt.Printf(";; variable \"%s\" added\n", matches[1])
 			}
 			if matches[1] == "start" {
 				continue
@@ -184,7 +184,7 @@ func main() {
 				if *flagv > 0 {
 					fmt.Printf(";; %s %s %s\n", mm[1], matches[1], mm[2])
 				}
-				cg.AddConstraint(0, i1, op, val2)
+				cg.Add(0, i1, op, val2)
 				continue
 			}
 
@@ -206,7 +206,7 @@ func main() {
 				if *flagv > 0 {
 					fmt.Printf(";; %s - %s %s %s\n", mm[1], mm[2], matches[1], mm[3])
 				}
-				cg.AddConstraint(i2, i1, op, val)
+				cg.Add(i2, i1, op, val)
 				continue
 			}
 
@@ -228,7 +228,7 @@ func main() {
 				if *flagv > 0 {
 					fmt.Printf(";; %s - %s %s %d\n", mm[1], mm[2], matches[1], -val)
 				}
-				cg.AddConstraint(i2, i1, op, -val)
+				cg.Add(i2, i1, op, -val)
 				continue
 			}
 		}
@@ -290,5 +290,21 @@ func callz3(cg dcsolver.CGraph) {
 	}
 
 	fmt.Print("\n*** Z3: SAT ***\n\n")
-	fmt.Print(out.String())
+	reg_z3 := regexp.MustCompile(`\(define-fun\s+(?P<varname>[[:alpha:]][[:word:]]*)\s+\(\) Int\s*(?P<value>\d+)\s*\)`)
+	matches := reg_z3.FindAllStringSubmatch(out.String(), -1)
+	output := map[string]string{}
+	for _, s := range matches {
+		output[s[1]] = s[2]
+	}
+	fmt.Print("[")
+	for k, name := range cg.Names {
+		if k == 0 {
+			continue
+		}
+		if k != 1 {
+			fmt.Print(", ")
+		}
+		fmt.Printf("%s: %s", name, output[name])
+	}
+	fmt.Print("]\n")
 }
