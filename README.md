@@ -16,7 +16,8 @@ b` and `0 - x < a`, respectively.
 For a more formal approach, and an incremental method, see:
 
 * Ramalingam, G., Song, J., Joskowicz, L. et al. [Solving Systems of Difference
-Constraints Incrementally](https://doi.org/10.1007/PL00009261). Algorithmica 23, 261–275 (1999).
+Constraints Incrementally](https://doi.org/10.1007/PL00009261). Algorithmica 23,
+261–275 (1999).
 
 Supporting strict constraints (meaning answering if the system is SAT for
 rational/real values) is more difficult. Some solution is given in:
