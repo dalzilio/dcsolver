@@ -29,31 +29,35 @@ type Arc struct {
 	Length Bound
 }
 
-// AddConstraint adds a constraint to the graph and returns false if not satisfiable
-func (cg *CGraph) AddConstraint(start int, end int, op Operation, n int) bool {
+// Add adds a constraint to the graph and returns false if the resulting system
+// is not satisfiable.
+func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
+	if start == end {
+		return true
+	}
 	switch op {
 	case LTHAN, LTEQ:
-		return cg.AddEdge(Arc{Start: start, End: end, Length: Bound{Operation: op, Value: n}})
+		return cg.adds(Arc{Start: start, End: end, Length: Bound{Operation: op, Value: n}})
 	case EQ:
-		cg.AddEdge(Arc{Start: start, End: end, Length: Bound{Operation: LTEQ, Value: n}})
+		cg.adds(Arc{Start: start, End: end, Length: Bound{Operation: LTEQ, Value: n}})
 		if !cg.SAT {
 			return false
 		}
-		return cg.AddEdge(Arc{Start: end, End: start, Length: Bound{Operation: LTEQ, Value: -n}})
+		return cg.adds(Arc{Start: end, End: start, Length: Bound{Operation: LTEQ, Value: -n}})
 	case GTHAN:
-		return cg.AddEdge(Arc{Start: end, End: start, Length: Bound{Operation: LTHAN, Value: -n}})
+		return cg.adds(Arc{Start: end, End: start, Length: Bound{Operation: LTHAN, Value: -n}})
 	case GTEQ:
-		return cg.AddEdge(Arc{Start: end, End: start, Length: Bound{Operation: LTEQ, Value: -n}})
+		return cg.adds(Arc{Start: end, End: start, Length: Bound{Operation: LTEQ, Value: -n}})
 	}
 	log.Fatal("not possible")
 	return false
 }
 
-// AddEdge adds constraints of the form zj - zi ≤ a. We assume that i and j are
+// adds adds constraints of the form zj - zi ≤ a. We assume that i and j are
 // different. We update the current graph with an arc i -> j of length a, if it
 // did not exist yet, or if a.Length is smaller than the existing length. We
 // return false as soon as the system is not satisfiable.
-func (cg *CGraph) AddEdge(a Arc) bool {
+func (cg *CGraph) adds(a Arc) bool {
 	tpos, length := cg.edges(a.Start, a.End)
 	if tpos >= 0 && BCompare(a.Length, length) >= 0 {
 		// We do not need to update the graph.
@@ -119,9 +123,15 @@ func NewDCS() CGraph {
 }
 
 // AddVar adds a new (top) variable zn.
-func (cg *CGraph) AddVar(name string) {
+func (cg *CGraph) AddVar(name string) error {
+	if name == "start" {
+		return fmt.Errorf("start is a reserved variable name")
+	}
 	cg.Names = append(cg.Names, name)
 	cg.D = append(cg.D, Bound{Operation: LTEQ, Value: 0})
+	// We add the constraint 0 - zn ≤ 0
+	cg.adds(Arc{Start: len(cg.Names) - 1, End: 0, Length: Bound{Operation: LTEQ, Value: 0}})
+	return nil
 }
 
 func (cg *CGraph) PrintFeasible() string {
@@ -200,7 +210,12 @@ func (cg *CGraph) PrintSMTLIB() string {
 
 	buf.WriteRune('\n')
 
-	for k := range len(cg.Edges) {
+	keys := set.Set{}
+	for k := range cg.Edges {
+		keys = set.Add(keys, k)
+	}
+
+	for _, k := range keys {
 		for _, e := range cg.Edges[k] {
 			buf.WriteString("(assert (")
 			if e.Length.Operation == LTEQ {
