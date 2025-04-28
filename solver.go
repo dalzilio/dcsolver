@@ -122,15 +122,18 @@ func NewDCS() CGraph {
 	}
 }
 
-// AddVar adds a new (top) variable zn.
-func (cg *CGraph) AddVar(name string) error {
-	if name == "start" {
-		return fmt.Errorf("start is a reserved variable name")
+// AddVars adds new (top) variables with the constraint that the result is
+// positive.
+func (cg *CGraph) AddVars(names ...string) error {
+	for _, name := range names {
+		if name == "start" {
+			return fmt.Errorf("start is a reserved variable name")
+		}
+		cg.Names = append(cg.Names, name)
+		cg.D = append(cg.D, Bound{Operation: LTEQ, Value: 0})
+		// We add the constraint 0 - zn ≤ 0
+		cg.adds(Arc{Start: len(cg.Names) - 1, End: 0, Length: Bound{Operation: LTEQ, Value: 0}})
 	}
-	cg.Names = append(cg.Names, name)
-	cg.D = append(cg.D, Bound{Operation: LTEQ, Value: 0})
-	// We add the constraint 0 - zn ≤ 0
-	cg.adds(Arc{Start: len(cg.Names) - 1, End: 0, Length: Bound{Operation: LTEQ, Value: 0}})
 	return nil
 }
 
@@ -196,13 +199,13 @@ func (cg *CGraph) PrintSMTLIB() string {
 	buf := bytes.Buffer{}
 	for k, name := range cg.Names {
 		if k == 0 {
-			buf.WriteString("(declare-const start Int)\n")
+			buf.WriteString("(declare-const start Real)\n")
 			buf.WriteString("(assert (= start 0))\n")
 			continue
 		}
 		buf.WriteString("(declare-const ")
 		buf.WriteString(name)
-		buf.WriteString(" Int)\n")
+		buf.WriteString(" Real)\n")
 		buf.WriteString("(assert (>= ")
 		buf.WriteString(name)
 		buf.WriteString(" 0))\n")
