@@ -13,12 +13,12 @@
 ;;     z4 - z1 ≤ 4
 ;; 0 ≤ z4 - z3 ≤ 3
 
-(declare-const start Int)
-(declare-const z0 Int)
-(declare-const z1 Int)
-(declare-const z2 Int)
-(declare-const z3 Int)
-(declare-const z4 Int)
+(declare-const start Real)
+(declare-const z0 Real)
+(declare-const z1 Real)
+(declare-const z2 Real)
+(declare-const z3 Real)
+(declare-const z4 Real)
 
 (assert (<= (- z0 start) 3))
 (assert (<= (- start z0) 0))

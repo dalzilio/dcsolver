@@ -11,13 +11,13 @@
 ;; 3 ≤ z2 < 4
 ;; 0 ≤ z2 - z1 < ∞
 
-(declare-const start Int)
+(declare-const start Real)
 (assert (= start 0))
-(declare-const z0 Int)
+(declare-const z0 Real)
 (assert (>= z0 0))
-(declare-const z1 Int)
+(declare-const z1 Real)
 (assert (>= z1 0))
-(declare-const z2 Int)
+(declare-const z2 Real)
 (assert (>= z2 0))
 
 (assert (< (- z0 start) 2))
