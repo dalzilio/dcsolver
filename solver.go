@@ -29,6 +29,30 @@ type Arc struct {
 	Length Bound
 }
 
+func NewDCS() CGraph {
+	return CGraph{
+		SAT:   true,
+		Names: []string{"start"},
+		D:     []Bound{{Operation: LTEQ, Value: 0}},
+		Edges: map[int][]Arc{0: {}},
+	}
+}
+
+// AddVars adds new (top) variables with the constraint that the result is
+// positive.
+func (cg *CGraph) AddVars(names ...string) error {
+	for _, name := range names {
+		if name == "start" {
+			return fmt.Errorf("start is a reserved variable name")
+		}
+		cg.Names = append(cg.Names, name)
+		cg.D = append(cg.D, Bound{Operation: LTEQ, Value: 0})
+		// We add the constraint 0 - zn ≤ 0
+		cg.adds(Arc{Start: len(cg.Names) - 1, End: 0, Length: Bound{Operation: LTEQ, Value: 0}})
+	}
+	return nil
+}
+
 // Add adds a constraint to the graph and returns false if the resulting system
 // is not satisfiable.
 func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
@@ -112,30 +136,6 @@ func (cg *CGraph) edges(u int, v int) (tpos int, length Bound) {
 }
 
 /*****************************************************************************/
-
-func NewDCS() CGraph {
-	return CGraph{
-		SAT:   true,
-		Names: []string{"start"},
-		D:     []Bound{{Operation: LTEQ, Value: 0}},
-		Edges: map[int][]Arc{0: {}},
-	}
-}
-
-// AddVars adds new (top) variables with the constraint that the result is
-// positive.
-func (cg *CGraph) AddVars(names ...string) error {
-	for _, name := range names {
-		if name == "start" {
-			return fmt.Errorf("start is a reserved variable name")
-		}
-		cg.Names = append(cg.Names, name)
-		cg.D = append(cg.D, Bound{Operation: LTEQ, Value: 0})
-		// We add the constraint 0 - zn ≤ 0
-		cg.adds(Arc{Start: len(cg.Names) - 1, End: 0, Length: Bound{Operation: LTEQ, Value: 0}})
-	}
-	return nil
-}
 
 func (cg *CGraph) PrintFeasible() string {
 	buf := bytes.Buffer{}
