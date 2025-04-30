@@ -11,7 +11,9 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"slices"
 	"strconv"
+	"unique"
 
 	"github.com/dalzilio/dcsolver/set"
 )
@@ -29,6 +31,17 @@ type Arc struct {
 	Length Bound
 }
 
+// ACompare returns a negative value if e1 is less than e2, 0 if they have the
+// same end points, and a positive value otherwise. We ony compare the Start and
+// End points, because we have at most one arc for every pair of endpoints in
+// each DCS.
+func ACompare(e1, e2 Arc) int {
+	if e1.Start == e2.Start {
+		return e1.End - e2.End
+	}
+	return e1.Start - e2.Start
+}
+
 func NewDCS() CGraph {
 	return CGraph{
 		SAT:   true,
@@ -38,7 +51,7 @@ func NewDCS() CGraph {
 	}
 }
 
-// AddVars adds new (top) variables with the constraint that the result is
+// AddVars adds new (top) variables with the constraint that their value is
 // positive.
 func (cg *CGraph) AddVars(names ...string) error {
 	for _, name := range names {
@@ -53,8 +66,21 @@ func (cg *CGraph) AddVars(names ...string) error {
 	return nil
 }
 
-// Add adds a constraint to the graph and returns false if the resulting system
-// is not satisfiable.
+// AddNVar adds n new variables with names z(i) ... z(i+n), where i is the index
+// of the first fresh variable. Like with AddVars, we add the constraint that
+// thei value are all positive.
+func (cg *CGraph) AddNVar(n int) {
+	i := len(cg.Names) - 1
+	for j := range n {
+		cg.Names = append(cg.Names, "z"+strconv.Itoa(i+j))
+		cg.D = append(cg.D, Bound{Operation: LTEQ, Value: 0})
+		// We add the constraint 0 - zn ≤ 0
+		cg.adds(Arc{Start: len(cg.Names) - 1, End: 0, Length: Bound{Operation: LTEQ, Value: 0}})
+	}
+}
+
+// Add adds a constraint (end - start op n) to the graph, where op is one of {<,
+// <=, =, >=, >}, and returns false if the resulting system is not satisfiable.
 func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
 	if start == end {
 		return true
@@ -64,9 +90,6 @@ func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
 		return cg.adds(Arc{Start: start, End: end, Length: Bound{Operation: op, Value: n}})
 	case EQ:
 		cg.adds(Arc{Start: start, End: end, Length: Bound{Operation: LTEQ, Value: n}})
-		if !cg.SAT {
-			return false
-		}
 		return cg.adds(Arc{Start: end, End: start, Length: Bound{Operation: LTEQ, Value: -n}})
 	case GTHAN:
 		return cg.adds(Arc{Start: end, End: start, Length: Bound{Operation: LTHAN, Value: -n}})
@@ -80,17 +103,20 @@ func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
 // adds adds constraints of the form zj - zi ≤ a. We assume that i and j are
 // different. We update the current graph with an arc i -> j of length a, if it
 // did not exist yet, or if a.Length is smaller than the existing length. We
-// return false as soon as the system is not satisfiable.
+// return false as soon as the system is not satisfiable. We sort edges by
+// increasing order according to ACompare.
 func (cg *CGraph) adds(a Arc) bool {
-	tpos, length := cg.edges(a.Start, a.End)
-	if tpos >= 0 && BCompare(a.Length, length) >= 0 {
-		// We do not need to update the graph.
-		return true
-	}
-	if tpos < 0 {
-		cg.Edges[a.Start] = append(cg.Edges[a.Start], a)
+	index, found := slices.BinarySearchFunc(cg.Edges[a.Start], a, ACompare)
+	if found {
+		b := cg.Edges[a.Start][index]
+		if BCompare(b.Length, a.Length) <= 0 {
+			// The old bound is less than the new one. We do not need to update
+			// the graph.
+			return true
+		}
+		cg.Edges[a.Start][index] = a
 	} else {
-		cg.Edges[a.Start][tpos].Length = a.Length
+		cg.Edges[a.Start] = slices.Insert(cg.Edges[a.Start], index, a)
 	}
 
 	// We apply Bellman-Ford but we only relax vertices which are the target of
@@ -137,107 +163,61 @@ func (cg *CGraph) edges(u int, v int) (tpos int, length Bound) {
 
 /*****************************************************************************/
 
-func (cg *CGraph) PrintFeasible() string {
-	buf := bytes.Buffer{}
-
-	for k, v := range cg.D {
-		if k == 0 {
-			buf.WriteString("[")
-			continue
-		}
-		if k > 1 {
-			buf.WriteString(", ")
-		}
-		diff := BSubstract(v, cg.D[0])
-		buf.WriteString(fmt.Sprintf("%s: %d", cg.Names[k], diff.Value))
-		if diff.Operation != LTEQ {
-			buf.WriteRune('⁻')
-		}
+// Clone returns a deep copy of a DCS graph.
+func (cg *CGraph) Clone() CGraph {
+	result := CGraph{
+		SAT:   cg.SAT,
+		Names: slices.Clone(cg.Names),
+		D:     slices.Clone(cg.D),
+		Edges: make(map[int][]Arc, len(cg.Edges)),
 	}
-	buf.WriteString("]")
-	return buf.String()
+	for k, v := range cg.Edges {
+		result.Edges[k] = slices.Clone(v)
+	}
+	return result
 }
 
-func (cg *CGraph) PrintSystem() string {
-	buf := bytes.Buffer{}
-
-	for k1 := range len(cg.Names) {
-		if k1 == 0 {
-			continue
-		}
-		for k2 := range k1 {
-			// We print the constraint associated to k1 - k2, therefore the arc k2 -> k1.
-			tpos1, sup := cg.edges(k2, k1)
-			tpos2, inf := cg.edges(k1, k2)
-			if tpos1 < 0 && tpos2 < 0 {
-				continue
-			}
-			if tpos2 >= 0 {
-				inf.Value = -inf.Value
-				buf.WriteString(inf.PrintLowerBound())
-				buf.WriteByte(' ')
-			} else {
-				buf.WriteString("    ")
-			}
-			buf.WriteString(cg.Names[k1])
-			if k2 != 0 {
-				buf.WriteString(" - ")
-				buf.WriteString(cg.Names[k2])
-			}
-			if tpos1 >= 0 {
-				buf.WriteByte(' ')
-				buf.WriteString(sup.PrintUpperBound())
-			}
-			buf.WriteByte('\n')
+// Equal reports if two systems have the same set of edges, compared using ==.
+// Note that two DCS with different Names slices can be equal.
+func Equal(cg1, cg2 CGraph) bool {
+	if len(cg1.Names) != len(cg2.Names) || len(cg1.Edges) != len(cg2.Edges) {
+		return false
+	}
+	for k := range len(cg1.Names) {
+		if !slices.Equal(cg1.Edges[k], cg2.Edges[k]) {
+			return false
 		}
 	}
-	buf.WriteString("\n")
-	return buf.String()
+	return true
 }
 
-func (cg *CGraph) PrintSMTLIB() string {
+/*****************************************************************************/
+
+// Key is a unique identifier for each DCS
+type Key unique.Handle[string]
+
+func (dk Key) Value() string {
+	return unique.Handle[string](dk).Value()
+}
+
+// Unique creates a unique key from a DBM
+func (cg *CGraph) Unique() Key {
 	buf := bytes.Buffer{}
-	for k, name := range cg.Names {
-		if k == 0 {
-			buf.WriteString("(declare-const start Real)\n")
-			buf.WriteString("(assert (= start 0))\n")
-			continue
-		}
-		buf.WriteString("(declare-const ")
-		buf.WriteString(name)
-		buf.WriteString(" Real)\n")
-		buf.WriteString("(assert (>= ")
-		buf.WriteString(name)
-		buf.WriteString(" 0))\n")
-	}
-
-	buf.WriteRune('\n')
-
-	keys := set.Set{}
-	for k := range cg.Edges {
-		keys = set.Add(keys, k)
-	}
-
-	for _, k := range keys {
-		for _, e := range cg.Edges[k] {
-			buf.WriteString("(assert (")
-			if e.Length.Operation == LTEQ {
-				buf.WriteString("<= (- ")
-			} else {
-				buf.WriteString("< (- ")
-			}
-			buf.WriteString(cg.Names[e.End])
+	n := len(cg.Names)
+	buf.WriteString(strconv.Itoa(n))
+	buf.WriteByte('\n')
+	for k := range n {
+		for _, a := range cg.Edges[k] {
+			buf.WriteString(strconv.Itoa(a.End))
 			buf.WriteByte(' ')
-			buf.WriteString(cg.Names[e.Start])
-			buf.WriteString(") ")
-
-			if l := e.Length.Value; l < 0 {
-				buf.WriteString(fmt.Sprintf("(- %d)", -l))
+			if a.Length.Operation == LTEQ {
+				buf.WriteByte('=')
 			} else {
-				buf.WriteString(strconv.Itoa(l))
+				buf.WriteByte('<')
 			}
-			buf.WriteString("))\n")
+			buf.WriteString(strconv.Itoa(a.Length.Value))
 		}
+		buf.WriteByte('\n')
 	}
-	return buf.String()
+	return Key(unique.Make(buf.String()))
 }
