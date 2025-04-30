@@ -310,10 +310,13 @@ func (p *parser) scan() token {
 	return p.tok
 }
 
-func ReadSMTLIB(r io.Reader) (CGraph, error) {
-	// We parse the input file and populate our constraint graph. We also keep a
-	// association list between variables names and their index to check for
-	// repeated declarations.
+// ReadSMTLIB parses an input SMT specification incrementally and adds
+// constraints in a DCS. It also keeps an association list between variables
+// names and their index to check that we do not declare the same variable
+// twice. If the strict parameter is true, the function stops as soon as the
+// system is not satisfiable. If false, we parse the entirety of the
+// specification.
+func ReadSMTLIB(r io.Reader, strict bool) (CGraph, error) {
 	cg := NewDCS()
 	names := map[string]int{"start": 0}
 
@@ -401,7 +404,7 @@ LOOP:
 					return cg, fmt.Errorf("malformed input at %s, wrong value", texp.pos)
 				}
 				cg.Add(i2, i1, op, val)
-				if !cg.SAT {
+				if strict && !cg.SAT {
 					break LOOP
 				}
 			case tokVAR:
@@ -415,7 +418,7 @@ LOOP:
 					return cg, fmt.Errorf("malformed input at %s, wrong value", texp.pos)
 				}
 				cg.Add(0, i, op, val)
-				if !cg.SAT {
+				if strict && !cg.SAT {
 					break LOOP
 				}
 			default:

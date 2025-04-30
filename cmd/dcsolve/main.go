@@ -79,9 +79,8 @@ func main() {
 	}
 	defer osfile.Close()
 
-	// We parse the input file and populate our constraint graph. We also keep a
-	// association list between variables names and their index.
-	cg, err := dcsolver.ReadSMTLIB(osfile)
+	// We parse the input file and populate our constraint graph.
+	cg, err := dcsolver.ReadSMTLIB(osfile, false)
 
 	if err != nil {
 		log.Fatalln(err)
