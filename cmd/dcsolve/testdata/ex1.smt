@@ -4,5 +4,4 @@
 
 (assert (< z0 2))
 (assert (<= (- z1 z0) 5))
-(assert (>= z0 2))
 (assert (<= (- z1 z0) 5))
