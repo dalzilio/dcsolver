@@ -164,7 +164,7 @@ func (cg *CGraph) edges(u int, v int) (tpos int, length Bound) {
 /*****************************************************************************/
 
 // Clone returns a deep copy of a DCS graph.
-func (cg *CGraph) Clone() CGraph {
+func (cg CGraph) Clone() CGraph {
 	result := CGraph{
 		SAT:   cg.SAT,
 		Names: slices.Clone(cg.Names),
@@ -191,6 +191,33 @@ func Equal(cg1, cg2 CGraph) bool {
 	return true
 }
 
+// Truncate returns a new DCS obtained from cg by deleting every variables
+// except the last n. The remaining variable with the smallest index taking the
+// role of start. We return an empty DCS if n is nul and we return a deep copy
+// of cg if n is larger than the number of variables in cg. Otherwise, the
+// result is a system with exactly n variables.
+func (cg CGraph) Truncate(n int) CGraph {
+	d := len(cg.Names)
+	if d <= n {
+		return cg.Clone()
+	}
+	res := NewDCS()
+	if n == 0 {
+		return res
+	}
+	res.AddNVar(n - 1)
+	first := d - n
+	for j := range n {
+		for _, e := range cg.Edges[first+j] {
+			if e.End < first {
+				continue
+			}
+			res.Add(j, e.End-first, e.Length.Operation, e.Length.Value)
+		}
+	}
+	return res
+}
+
 /*****************************************************************************/
 
 // Key is a unique identifier for each DCS
@@ -201,7 +228,7 @@ func (dk Key) Value() string {
 }
 
 // Unique creates a unique key from a DBM
-func (cg *CGraph) Unique() Key {
+func (cg CGraph) Unique() Key {
 	buf := bytes.Buffer{}
 	n := len(cg.Names)
 	buf.WriteString(strconv.Itoa(n))
