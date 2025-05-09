@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-func (cg *CGraph) PrintFeasible() string {
+func (cg CGraph) PrintFeasible() string {
 	buf := bytes.Buffer{}
 
 	for k, v := range cg.D {
@@ -31,7 +31,7 @@ func (cg *CGraph) PrintFeasible() string {
 	return buf.String()
 }
 
-func (cg *CGraph) PrintSystem() string {
+func (cg CGraph) PrintSystem() string {
 	buf := bytes.Buffer{}
 
 	for k1 := range len(cg.Names) {
@@ -67,7 +67,7 @@ func (cg *CGraph) PrintSystem() string {
 	return buf.String()
 }
 
-func (cg *CGraph) PrintSMTLIB() string {
+func (cg CGraph) PrintSMTLIB() string {
 	buf := bytes.Buffer{}
 	for k, name := range cg.Names {
 		if k == 0 {
