@@ -1,5 +1,5 @@
 // Copyright 2025. Silvano DAL ZILIO. All rights reserved.
-// Use of this source code is governed by the GPL license
+// Use of this source code is governed by the MIT license
 // that can be found in the LICENSE file.
 
 package dcsolver
@@ -11,11 +11,13 @@ import (
 )
 
 func (cg CGraph) PrintFeasible() string {
+	if !cg.SAT {
+		return "UNSAT"
+	}
 	buf := bytes.Buffer{}
-
+	buf.WriteString("[")
 	for k, v := range cg.D {
 		if k == 0 {
-			buf.WriteString("[")
 			continue
 		}
 		if k > 1 {

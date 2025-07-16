@@ -1,5 +1,5 @@
 // Copyright 2025. Silvano DAL ZILIO. All rights reserved.
-// Use of this source code is governed by the GPL license
+// Use of this source code is governed by the MIT license
 // that can be found in the LICENSE file.
 
 package dcsolver
@@ -15,7 +15,7 @@ import (
 )
 
 // ExecZ3 executes the command z3 on a SMT script generated from cg. We assume
-// that z3 is installed locally and can be resolved by [exec.LookPAth] (see
+// that z3 is installed locally and can be resolved by [exec.LookPath] (see
 // documentation for [exec.Command]). We return true if the system is
 // satisfiable, by a call to "(check-sat)", and false otherwise. When
 // satisifiable, the second returned value is a string representation of the

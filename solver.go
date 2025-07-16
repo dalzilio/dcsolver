@@ -1,5 +1,5 @@
 // Copyright 2025. Silvano DAL ZILIO. All rights reserved.
-// Use of this source code is governed by the GPL license
+// Use of this source code is governed by the MIT license
 // that can be found in the LICENSE file.
 
 // Package dcsolve implements a solver for linear systems of inequalities of the
@@ -15,9 +15,17 @@ import (
 	"strconv"
 	"unique"
 
-	"github.com/dalzilio/dcsolver/set"
+	"github.com/dalzilio/dcsolver/internal/set"
 )
 
+// CGraph is the type of DCS encoded using directed graph between variables. We
+// check satisifability by looking at the shortest distance between every node.
+// We rely on the fact that the system is satisifable if and only if there are
+// no cycles of negative length. We consider a "virtual" node (src) that is at
+// distance 0 from every vertex and compute the minimal distance from src.
+// Hence, this distance will be a negative integer -d in practice. This value is
+// recorded in the slice D and can be interpreted as a feasible solution that
+// maximize each variable.
 type CGraph struct {
 	SAT   bool          // true if system is satisfiable
 	Names []string      // Name of variables; 0 is for the start variables.
@@ -25,23 +33,30 @@ type CGraph struct {
 	Edges map[int][]Arc // Edges[i][j] = c represents the constraint zj - zi ≤ c.
 }
 
+// Arc is the type of constraints between variables in the DCS, encoding
+// constraints of the form: End - Start ≤ Length.Value. The comparison is strict
+// if the Bound operation is (and reciprocally). The only operation we use in
+// edges are LTHAN (strict inequality) and LTEQ (weak inequality).
 type Arc struct {
 	Start  int
 	End    int
 	Length Bound
 }
 
-// ACompare returns a negative value if e1 is less than e2, 0 if they have the
-// same end points, and a positive value otherwise. We ony compare the Start and
-// End points, because we have at most one arc for every pair of endpoints in
-// each DCS.
-func ACompare(e1, e2 Arc) int {
+// arc_compare_func returns a negative value if e1 is less than e2, 0 if they
+// have the same end points, and a positive value otherwise. We only compare the
+// Start and End points, because we have at most one arc for every pair of
+// endpoints in each DCS. This function is used to sort lists of arcs (and
+// therefore also for binarty search).
+func arc_compare_func(e1, e2 Arc) int {
 	if e1.Start == e2.Start {
 		return e1.End - e2.End
 	}
 	return e1.Start - e2.Start
 }
 
+// NewDCS returns a new system containing only the (default) start variable and
+// no constraints.
 func NewDCS() CGraph {
 	return CGraph{
 		SAT:   true,
@@ -52,7 +67,8 @@ func NewDCS() CGraph {
 }
 
 // AddVars adds new (top) variables with the constraint that their value is
-// positive.
+// positive. We assume that the names are different from each other, and
+// different from the variables already defined in [cg.Names].
 func (cg *CGraph) AddVars(names ...string) error {
 	for _, name := range names {
 		if name == "start" {
@@ -67,10 +83,12 @@ func (cg *CGraph) AddVars(names ...string) error {
 }
 
 // AddNVar adds n new variables with names z(i) ... z(i+n), where i is the index
-// of the first fresh variable. Like with AddVars, we add the constraint that
-// thei value are all positive.
+// of the first fresh variable. We start counting from 1, meaning that the first
+// variable added is z(1), with the convention that z(0) is an alias for the
+// start variable.  Like with AddVars, we add the constraint that their values
+// are all positive.
 func (cg *CGraph) AddNVar(n int) {
-	i := len(cg.Names) - 1
+	i := len(cg.Names)
 	for j := range n {
 		cg.Names = append(cg.Names, "z"+strconv.Itoa(i+j))
 		cg.D = append(cg.D, Bound{Operation: LTEQ, Value: 0})
@@ -81,6 +99,7 @@ func (cg *CGraph) AddNVar(n int) {
 
 // Add adds a constraint (end - start op n) to the graph, where op is one of {<,
 // <=, =, >=, >}, and returns false if the resulting system is not satisfiable.
+// We assume that start and end are both  valid variable indices.
 func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
 	if start == end {
 		return true
@@ -100,13 +119,30 @@ func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
 	return false
 }
 
+// ComparareVarWith returns true if the system cg is satisifiable after adding
+// the constraint "z(n) op d", but does not modify cg. For instance, when the
+// operation is LTEQ, this function returns true if it is possible for z(n) to
+// be less or equal than d in a feasible solution. We assume that n is a valid
+// variable index.
+func (cg *CGraph) ComparareVarWith(n int, op Operation, d int) bool {
+	// We copy the feasible solution and test if cg is still feasible when
+	// adding the constraint zc ≤ d. Finally, we restore cg to its previous
+	// state.
+	pastD := slices.Clone(cg.D)
+	pastSAT := cg.SAT
+	b := cg.Add(0, n, op, d)
+	cg.D, cg.SAT = pastD, pastSAT
+	return b
+}
+
 // adds adds constraints of the form zj - zi ≤ a. We assume that i and j are
 // different. We update the current graph with an arc i -> j of length a, if it
 // did not exist yet, or if a.Length is smaller than the existing length. We
-// return false as soon as the system is not satisfiable. We sort edges by
-// increasing order according to ACompare.
+// return false as soon as the system is not satisfiable.
 func (cg *CGraph) adds(a Arc) bool {
-	index, found := slices.BinarySearchFunc(cg.Edges[a.Start], a, ACompare)
+	// We sort edges by increasing order according to arc_compare_func in order
+	// to use BinarySearch.
+	index, found := slices.BinarySearchFunc(cg.Edges[a.Start], a, arc_compare_func)
 	if found {
 		b := cg.Edges[a.Start][index]
 		if BCompare(b.Length, a.Length) <= 0 {
@@ -220,14 +256,16 @@ func (cg CGraph) Truncate(n int) CGraph {
 
 /*****************************************************************************/
 
-// Key is a unique identifier for each DCS
+// Key is a unique identifier for each DCS generated using the unique package
+// from the standard loibrary.
 type Key unique.Handle[string]
 
 func (dk Key) Value() string {
 	return unique.Handle[string](dk).Value()
 }
 
-// Unique creates a unique key from a DBM
+// Unique creates a unique key from a DCS. Useful for quickly checking equality
+// between DCS when we need to compare the same systems more than once.
 func (cg CGraph) Unique() Key {
 	buf := bytes.Buffer{}
 	n := len(cg.Names)

@@ -1,5 +1,5 @@
 // Copyright 2025. Silvano DAL ZILIO. All rights reserved.
-// Use of this source code is governed by the GPL license
+// Use of this source code is governed by the MIT license
 // that can be found in the LICENSE file.
 
 package dcsolver_test

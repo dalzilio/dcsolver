@@ -12,30 +12,49 @@ using a restricted subset of SMT-LIB syntax.
 ## Usage
 
 You can find an example in the code of the dcsolve command, see
-`cmd/dcsolve/main.go`.
+`cmd/dcsolve/main.go`. The following example shows the basic usage of the
+package: create a new constraint system (DCS), add some variables and some
+constraints between them, then output a feasible solution. You can also look at
+the documentation example on the pkgsite for this package.
 
 ```go
 package main
 
 import (
-  "github.com/dalzilio/rudd"
-  "math/big"
+ "fmt"
+ "github.com/dalzilio/dcsolver"
 )
 
 func main() {
-  // create a new BDD with 6 variables, 10 000 nodes and a cache size of 5 000 (initially),
-  // with an implementation based on the BuDDY approach
-  bdd := rudd.New(6, Nodesize(10000), Cachesize(5000))
-  // n1 == x2 & x3 & x5
-  n1 := bdd.Makeset([]int{2, 3, 5})
-  // n2 == x1 | !x3 | x4
-  n2 := bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4))
-  // n3 == ∃ x2,x3,x5 . (n2 & x3)
-  n3 := bdd.AndExist(n1, n2, bdd.Ithvar(3))
-  // you can export a BDD in Graphviz's DOT format
-  fmt.Printf("Number of sat. assignments: %s\n", bdd.Satcount(n3))
-  fmt.Println(bdd.Stats())
-  bdd.Dot(os.Stdout)
+ // Create a new DCS and add variables x and y.
+ cg := dcsolver.NewDCS()
+ cg.AddVars("x", "y")
+
+ // Each variable can be manipulated using its index. Since every system has
+ // a reserved, default variable called "start" (with index 0), that stands
+ // for the initial date, variables x and y have index 1 and 2 respectively.
+ fmt.Printf("list of variables: %v\n", cg.Names)
+
+ // We can add constraints using one of the five supported operations: LTHAN
+ // (less-than, <), LTEQ (less-tha or equal, ≤), EQ (equal, =), GTHAN
+ // (greater-than, >), and GTEQ (greater-than or equal, ≥). By default, we
+ // have the constraint that every variable, say x, is positive: x ≥ 0.
+ //
+ // A call to Add(i, j, op, n) updates the DCS by adding the constraint 
+ // Names[j] - Names[i] op n. For instance, to add the constraint y ≥ x + 1 
+ // (that can be encoded as y - x GTEQ 1):
+ cg.Add(1, 2, dcsolver.GTEQ, 1)
+
+ // It is possible to print a human-readable representation of the system.
+ fmt.Print(cg.PrintSystem())
+ 
+ // You can check if the system is satisfiable by looking at the value of
+ // cg.SAT. If true, it is possible to output one feasible
+ // solution. A valuation of the form "x: 1⁻" stands for the fact that the
+ // value of x is of the form 1 ± ε, for ε a small positive value.
+ if (cg.SAT) {
+   fmt.Printf("Feasible solution: %s\n", cg.PrintFeasible())
+ }
 }
 ```
 
@@ -59,7 +78,8 @@ approach based on a simplified version of Bellman-Ford algorithm.
 Constraints Incrementally](https://doi.org/10.1007/PL00009261). Algorithmica 23,
 261–275 (1999).
 
-One main difference if our support for both strict and weak inequalities. Also,  Supporting strict constraints (meaning answering if the system is SAT for
+One main difference if our support for both strict and weak inequalities. Also,
+supporting strict constraints (meaning answering if the system is SAT for
 rational/real values) is more difficult. Some solution is given in:
 
 * Armando, A., Castellini, C., Giunchiglia, E., Maratea, M. (2005). [A SAT-Based
@@ -72,6 +92,9 @@ Science, vol 3542.
 
 The library has no dependencies outside the standard Go library. It uses Go
 modules and has been tested with Go 1.24.
+
+For function ExecZ3, we assume that the command z3 is installed locally and can
+be resolved by exec.LookPath.
 
 ## License
 

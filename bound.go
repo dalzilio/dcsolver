@@ -1,5 +1,5 @@
 // Copyright 2025. Silvano DAL ZILIO. All rights reserved.
-// Use of this source code is governed by the GPL license
+// Use of this source code is governed by the MIT license
 // that can be found in the LICENSE file.
 
 package dcsolver
@@ -28,12 +28,15 @@ type Bound struct {
 	Value int
 }
 
+// String returns a human-readable description of the value in b with a
+// superscript decoration to indicate if the bound is strict (e.g. 8⁺) or weak
+// (8⁼)
 func (b Bound) String() string {
 	switch b.Operation {
 	case LTEQ:
 		return fmt.Sprintf("%d⁼", b.Value)
 	default:
-		return fmt.Sprintf("%d⁻", b.Value)
+		return fmt.Sprintf("%d⁺", b.Value)
 	}
 }
 
@@ -117,7 +120,7 @@ func BCompare(a, b Bound) int {
 	return 1
 }
 
-// BMax returns the max of a and b.
+// BMax returns the maximum of a and b.
 func BMax(a, b Bound) Bound {
 	if BCompare(a, b) <= 0 {
 		return b
@@ -125,7 +128,7 @@ func BMax(a, b Bound) Bound {
 	return a
 }
 
-// BMin returns the min of a and b.
+// BMin returns the mininum of a and b.
 func BMin(a, b Bound) Bound {
 	if BCompare(a, b) <= 0 {
 		return a

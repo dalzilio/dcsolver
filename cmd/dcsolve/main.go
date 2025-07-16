@@ -1,23 +1,6 @@
 // Copyright 2025. Silvano DAL ZILIO. All rights reserved. Use of this source
-// code is governed by the GPL license that can be found in the LICENSE file.
+// code is governed by the MIT license that can be found in the LICENSE file.
 
-// Command dcsolve takes as input a file (with extension .smt) that describes a
-// difference systems using a subset of smt-lib syntax, with atoms of the
-// following form.
-//
-//   - (declare-const z Real)
-//   - (assert (op (- x y) n))
-//   - (assert (op (- x y) (- n)))
-//   - (assert (op x n))
-//   - (assert (op x (- n))
-//
-// where:
-//   - op is one of <, <=, >, >=, or =
-//   - x, y are free constant symbols of sort Real,
-//   - n is a (positive) numeral.
-//
-// We assume that every specification starts with the line (declare-const start
-// Real), where start is a reserved symbol, used to represent the start of time.
 package main
 
 import (
@@ -84,6 +67,11 @@ func main() {
 
 	if err != nil {
 		log.Fatalln(err)
+	}
+
+	if *flagv == 1 {
+		fmt.Print(cg.PrintSystem())
+		fmt.Println()
 	}
 
 	if *flagv > 1 {
