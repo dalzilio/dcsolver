@@ -119,12 +119,12 @@ func (cg *CGraph) Add(start int, end int, op Operation, n int) bool {
 	return false
 }
 
-// ComparareVarWith returns true if the system cg is satisifiable after adding
+// CompareVarWith returns true if the system cg is satisifiable after adding
 // the constraint "z(n) op d", but does not modify cg. For instance, when the
 // operation is LTEQ, this function returns true if it is possible for z(n) to
 // be less or equal than d in a feasible solution. We assume that n is a valid
 // variable index.
-func (cg *CGraph) ComparareVarWith(n int, op Operation, d int) bool {
+func (cg *CGraph) CompareVarWith(n int, op Operation, d int) bool {
 	// We copy the feasible solution and test if cg is still feasible when
 	// adding the constraint zc ≤ d. Finally, we restore cg to its previous
 	// state.
